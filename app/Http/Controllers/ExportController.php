@@ -1,0 +1,128 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Campaign;
+use App\Models\Link;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class ExportController extends Controller
+{
+    private function getExportLinks()
+    {
+        $user = Auth::user();
+
+        if ($user->hasRole('Admin Master') || $user->role === 'Admin Master') {
+            $campaignIds = Campaign::pluck('id');
+        } elseif ($user->hasRole('Admin') || $user->role === 'Admin') {
+            $accessIds = \App\Models\UserCampaignAccess::where('user_id', $user->id)->pluck('campaign_id');
+            if ($accessIds->count() > 0) {
+                $campaignIds = $accessIds;
+            } else {
+                $campaignIds = Campaign::pluck('id');
+            }
+        } elseif ($user->hasRole('Client') || $user->role === 'Client') {
+            $campaignIds = Campaign::where('client_id', $user->id)->pluck('id');
+        } else {
+            $campaignIds = collect();
+        }
+
+        $query = Link::whereIn('campaign_id', $campaignIds)->with('campaign', 'kategoriKonten');
+
+        if (request()->has('campaign_id') && request()->campaign_id != '') {
+            if ($campaignIds->contains(request()->campaign_id)) {
+                $query->where('campaign_id', request()->campaign_id);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if (request()->has('platform') && request()->platform != '') {
+            $query->where('platform', request()->platform);
+        }
+
+        if (request()->filled('start_date')) {
+            $query->whereDate('tanggal_upload', '>=', request()->start_date);
+        }
+
+        if (request()->filled('end_date')) {
+            $query->whereDate('tanggal_upload', '<=', request()->end_date);
+        }
+
+        return $query->orderBy('id', 'desc')->get();
+    }
+
+    public function clientPdf()
+    {
+        $links = $this->getExportLinks();
+        
+        $period = null;
+        if (request()->filled('start_date') || request()->filled('end_date')) {
+            $startStr = request('start_date') ? \Carbon\Carbon::parse(request('start_date'))->format('d/m/Y') : 'Awal';
+            $endStr = request('end_date') ? \Carbon\Carbon::parse(request('end_date'))->format('d/m/Y') : 'Sekarang';
+            $period = "Periode: {$startStr} s/d {$endStr}";
+        }
+
+        $data = [
+            'title' => 'Laporan Engagement Konten - ' . Auth::user()->name,
+            'date' => date('d M Y'),
+            'period' => $period,
+            'links' => $links,
+        ];
+
+        // Ensure you have run: composer require barryvdh/laravel-dompdf
+        $pdf = Pdf::loadView('exports.client-pdf', $data)->setPaper('a4', 'landscape');
+        
+        return $pdf->download('laporan-engagement-'.date('Ymd').'.pdf');
+    }
+
+    public function clientExcel()
+    {
+        $links = $this->getExportLinks();
+
+        $filename = "laporan-engagement-" . date('Ymd') . ".csv";
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$filename",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['No', 'Tanggal', 'Platform', 'Campaign', 'Akun', 'Kategori', 'URL', 'Views', 'Likes', 'Comments', 'Shares', 'Saves', 'Engagement Rate (%)', 'Status'];
+
+        $callback = function() use($links, $columns) {
+            $file = fopen('php://output', 'w');
+            // Write UTF-8 BOM for Excel compatibility
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            fputcsv($file, $columns);
+
+            foreach ($links as $index => $link) {
+                fputcsv($file, [
+                    $index + 1,
+                    $link->tanggal_upload ? \Carbon\Carbon::parse($link->tanggal_upload)->format('d/m/Y') : ($link->updated_at ? \Carbon\Carbon::parse($link->updated_at)->format('d/m/Y') : '-'),
+                    $link->platform,
+                    $link->campaign->nama_campaign ?? '-',
+                    $link->username ? (str_starts_with($link->username, '@') ? $link->username : '@' . $link->username) : '-',
+                    $link->kategoriKonten->nama ?? '-',
+                    $link->url,
+                    $link->views ?? 0,
+                    $link->likes ?? 0,
+                    $link->comments ?? 0,
+                    $link->shares ?? 0,
+                    $link->saves ?? 0,
+                    number_format($link->engagement_rate ?? 0, 2, '.', ''),
+                    $link->status_scraping ?? '-'
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+}
