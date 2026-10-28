@@ -21,7 +21,6 @@ class LandingCmsController extends Controller
 
         $whyJoins = LandingItem::ofType('why_join')->active()->ordered()->get();
         $notFors = LandingItem::ofType('not_for')->active()->ordered()->get();
-        $howSteps = LandingItem::ofType('how_step')->active()->ordered()->get();
         $ctaChips = LandingItem::ofType('cta_chip')->active()->ordered()->get();
         $clients = LandingItem::ofType('client_logo')->active()->ordered()->get();
         $portfolios = LandingItem::ofType('portfolio')->active()->ordered()->get();
@@ -40,7 +39,6 @@ class LandingCmsController extends Controller
             'settings',
             'whyJoins',
             'notFors',
-            'howSteps',
             'ctaChips',
             'clients',
             'portfolios',
@@ -60,7 +58,6 @@ class LandingCmsController extends Controller
 
         $whyJoins = LandingItem::ofType('why_join')->ordered()->get();
         $notFors = LandingItem::ofType('not_for')->ordered()->get();
-        $howSteps = LandingItem::ofType('how_step')->ordered()->get();
         $ctaChips = LandingItem::ofType('cta_chip')->ordered()->get();
         $clients = LandingItem::ofType('client_logo')->ordered()->get();
         $portfolios = LandingItem::ofType('portfolio')->ordered()->get();
@@ -69,7 +66,6 @@ class LandingCmsController extends Controller
             'settings',
             'whyJoins',
             'notFors',
-            'howSteps',
             'ctaChips',
             'clients',
             'portfolios'

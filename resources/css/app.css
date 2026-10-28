@@ -6,23 +6,23 @@
   :root {
     --font-family-base: 'Montserrat', sans-serif;
 
-    /* Base Brand Colors (Light Mode) */
-    --brand-blue: #2563eb;
-    --brand-blue-hover: #1d4ed8;
-    --brand-purple: #7c3aed;
-    --brand-purple-hover: #6d28d9;
-    --brand-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    /* Base Brand Colors (Light Mode) - satu aksen oranye, sama dengan landing page */
+    --brand-blue: #F26A1B;
+    --brand-blue-hover: #D95A10;
+    --brand-purple: #D9480F;
+    --brand-purple-hover: #C2410C;
+    --brand-gradient: linear-gradient(135deg, #FF8A2B 0%, #F2530A 100%);
 
     /* Neutral / Surface */
-    --bg-body: #f8fafc;
+    --bg-body: #FAFAFA;
     --bg-surface: #ffffff;
     --bg-card: #ffffff;
-    --border-color: #e2e8f0;
-    
+    --border-color: #E4E4E7;
+
     /* Typography */
-    --text-primary: #0f172a;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
+    --text-primary: #18181B;
+    --text-secondary: #71717A;
+    --text-muted: #A1A1AA;
 
     /* Status Tokens */
     --status-success: #10b981;
@@ -33,22 +33,22 @@
 
   [data-theme="dark"], .dark {
     /* Base Brand Colors (Dark Mode) */
-    --brand-blue: #3b82f6;
-    --brand-blue-hover: #60a5fa;
-    --brand-purple: #8b5cf6;
-    --brand-purple-hover: #a78bfa;
-    --brand-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    --brand-blue: #FF7A2E;
+    --brand-blue-hover: #FF9150;
+    --brand-purple: #F2530A;
+    --brand-purple-hover: #FF7A2E;
+    --brand-gradient: linear-gradient(135deg, #FF8A2B 0%, #F2530A 100%);
 
-    /* High-Contrast Dark Surface & Background */
-    --bg-body: #090d16;
-    --bg-surface: #111827;
-    --bg-card: #1f2937;
-    --border-color: #374151;
+    /* Dark Surface & Background (netral hangat) */
+    --bg-body: #0A0A0B;
+    --bg-surface: #111113;
+    --bg-card: #18181B;
+    --border-color: #27272A;
 
     /* High-Contrast Typography */
-    --text-primary: #f9fafb;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
 
     /* Status Tokens */
     --status-success: #10b981;

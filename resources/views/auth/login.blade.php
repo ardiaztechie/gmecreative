@@ -55,7 +55,7 @@
                     <x-input-error :messages="$errors->get('password')" class="mt-2" />
                 </div>
 
-                <!-- Remember Me & Forgot Password -->
+                <!-- Remember Me -->
                 <div class="flex items-center justify-between">
                     <label for="remember_me" class="inline-flex items-center group cursor-pointer">
                         <input
@@ -72,7 +72,7 @@
 
                 <!-- Submit Button -->
                 <div class="pt-2">
-                    <x-primary-button class="w-full py-3.5 flex justify-center text-sm font-bold tracking-wider uppercase rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/35 hover:-translate-y-0.5 active:translate-y-0 transition duration-150">
+                    <x-primary-button class="w-full py-3.5 flex justify-center text-sm font-bold tracking-wider uppercase rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/35 hover:-translate-y-0.5 active:translate-y-0 transition duration-150">
                         Masuk Ke Dashboard
                     </x-primary-button>
                 </div>
@@ -80,7 +80,7 @@
         </div>
 
         <!-- Right Side: Lottie Animation Panel -->
-        <div class="hidden md:flex flex-col items-center justify-center p-12 bg-gradient-to-br from-blue-600 to-indigo-700 text-white relative overflow-hidden">
+        <div class="hidden md:flex flex-col items-center justify-center p-12 bg-gradient-to-br from-orange-500 to-orange-700 text-white relative overflow-hidden">
             <!-- Background pattern -->
             <div class="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none"></div>
             <div class="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/5 blur-2xl"></div>
@@ -92,7 +92,7 @@
 
                 <div class="space-y-3">
                     <h3 class="text-xl font-bold tracking-tight">Real-time Scraping Engine</h3>
-                    <p class="text-xs text-blue-100/80 leading-relaxed font-medium">
+                    <p class="text-xs text-orange-50/90 leading-relaxed font-medium">
                         Pantau performa likes, views, dan comment creator secara akurat dengan integrasi scrap otomatis.
                     </p>
                 </div>
@@ -118,7 +118,7 @@
                     renderer: 'svg',
                     loop: true,
                     autoplay: true,
-                    path: '{{ asset("images/animasi.json") }}'
+                    path: '{{ asset("images/animasi-orange.json") }}'
                 });
             }
         });
