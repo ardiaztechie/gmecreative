@@ -158,22 +158,28 @@ class LinkController extends Controller
             $campaignObj = \App\Models\Campaign::find($request->campaign_id);
             $platform = $this->detectPlatform($url, $campaignObj->platform ?? null);
 
-            $link = Link::firstOrCreate(
-                ['campaign_id' => $request->campaign_id, 'url' => $url],
-                [
-                    'kategori_konten_id'  => $request->kategori_konten_id,
-                    'kategori_creator_id' => $request->kategori_creator_id,
-                    'platform'            => $platform,
-                    'tanggal_upload'      => now()->toDateString(),
-                    'status_scraping'     => 'Pending',
-                ]
-            );
+            // Cek ke SELURUH campaign (termasuk variasi garis miring), bukan hanya campaign yang dipilih
+            $existing = Link::whereIn('url', $this->urlVariants($url))->first();
 
-            if ($link->wasRecentlyCreated) {
-                $insertedCount = 1;
-            } else {
-                $duplicateCount = 1;
+            if ($existing) {
+                $pesan = ($existing->campaign_id == $request->campaign_id)
+                    ? 'Link ini sudah ada di campaign ini.'
+                    : 'Link ini sudah terdaftar di campaign lain, jadi tidak bisa ditambahkan lagi.';
+
+                return redirect()->back()->with('warning', $pesan);
             }
+
+            Link::create([
+                'campaign_id'         => $request->campaign_id,
+                'kategori_konten_id'  => $request->kategori_konten_id,
+                'kategori_creator_id' => $request->kategori_creator_id,
+                'url'                 => $url,
+                'platform'            => $platform,
+                'tanggal_upload'      => now()->toDateString(),
+                'status_scraping'     => 'Pending',
+            ]);
+
+            $insertedCount = 1;
 
         } elseif ($request->type === 'bulk') {
             $request->validate([
@@ -188,24 +194,23 @@ class LinkController extends Controller
                 if ($url) {
                     $platform = $this->detectPlatform($url, $campaignObj->platform ?? null);
 
-                    $link = Link::firstOrCreate(
-                        //  1: kunci pencarian duplikat
-                        ['campaign_id' => $request->campaign_id, 'url' => $url],
-                        //  2: diisi hanya kalau baris baru dibuat
-                        [
-                            'kategori_konten_id'  => $request->kategori_konten_id,
-                            'kategori_creator_id' => $request->kategori_creator_id,
-                            'platform'            => $platform,
-                            'tanggal_upload'      => now()->toDateString(),
-                            'status_scraping'     => 'Pending',
-                        ]
-                    );
-
-                    if ($link->wasRecentlyCreated) {
-                        $insertedCount++;
-                    } else {
+                    // Sudah ada di campaign mana pun? Lewati URL ini.
+                    if (Link::whereIn('url', $this->urlVariants($url))->exists()) {
                         $duplicateCount++;
+                        continue;
                     }
+
+                    Link::create([
+                        'campaign_id'         => $request->campaign_id,
+                        'kategori_konten_id'  => $request->kategori_konten_id,
+                        'kategori_creator_id' => $request->kategori_creator_id,
+                        'url'                 => $url,
+                        'platform'            => $platform,
+                        'tanggal_upload'      => now()->toDateString(),
+                        'status_scraping'     => 'Pending',
+                    ]);
+
+                    $insertedCount++;
                 }
             }
 
@@ -474,6 +479,7 @@ class LinkController extends Controller
             $seenUrls = [];
             $insertedCount = 0;
             $skippedPlatformCount = 0;
+            $otherCampaignCount = 0;
 
             foreach ($rowsData as $r) {
                 $url = $r['url'];
@@ -497,6 +503,16 @@ class LinkController extends Controller
                         $skippedPlatformCount++;
                         continue;
                     }
+                }
+
+                // URL ini sudah dimiliki campaign lain? Lewati.
+                $existsElsewhere = Link::whereIn('url', $this->urlVariants($url))
+                    ->where('campaign_id', '!=', $request->campaign_id)
+                    ->exists();
+
+                if ($existsElsewhere) {
+                    $otherCampaignCount++;
+                    continue;
                 }
 
                 $views = (int)($r['views'] ?? 0);
@@ -538,9 +554,12 @@ class LinkController extends Controller
                 if ($skippedPlatformCount > 0) {
                     $msg .= " ({$skippedPlatformCount} link dilewati karena jenis platform tidak sesuai dengan Campaign '{$campaignObj->nama_campaign}' - Platform: {$campaignObj->platform}).";
                 }
+                if ($otherCampaignCount > 0) {
+                    $msg .= " ({$otherCampaignCount} link dilewati karena sudah terdaftar di campaign lain.)";
+                }
                 return redirect()->route('operasional-konten.index')->with('success', $msg);
-            } elseif ($skippedPlatformCount > 0) {
-                return redirect()->route('operasional-konten.index')->with('warning', "Tidak ada link yang diimpor. Total {$skippedPlatformCount} link dalam file dilewati karena tidak sesuai dengan platform Campaign '{$campaignObj->nama_campaign}' (Platform: {$campaignObj->platform}).");
+            } elseif ($skippedPlatformCount > 0 || $otherCampaignCount > 0) {
+                return redirect()->route('operasional-konten.index')->with('warning', "Tidak ada link yang diimpor. Dilewati: {$skippedPlatformCount} karena platform tidak sesuai, {$otherCampaignCount} karena sudah terdaftar di campaign lain.");
             } else {
                 return redirect()->route('operasional-konten.index')->with('error', 'Tidak ditemukan link video yang valid dalam file Excel/CSV yang diupload.');
             }
@@ -934,6 +953,15 @@ class LinkController extends Controller
         } catch (Exception $e) {
             return redirect()->back()->with('error', 'Koneksi Apify Gagal: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Variasi penulisan URL yang dianggap sama (dengan / tanpa garis miring di akhir)
+     */
+    private function urlVariants(string $url): array
+    {
+        $base = rtrim($url, '/');
+        return array_values(array_unique([$url, $base, $base . '/']));
     }
 
     /**
