@@ -69,10 +69,10 @@
             this.deleteTargetForm = formElement;
             if (isBulk) {
                 this.deleteConfirmTitle = 'Hapus Link Terpilih (' + this.selectedIds.length + ' Item)';
-                this.deleteConfirmMessage = 'Apakah Anda yakin ingin menghapus ' + this.selectedIds.length + ' link terpilih? Data metrik dan skor SAW akan diperbarui.';
+                                this.deleteConfirmMessage = 'Apakah Anda yakin ingin menghapus ' + this.selectedIds.length + ' link terpilih? Data link akan dihapus permanen.';
             } else {
                 this.deleteConfirmTitle = 'Hapus Link Konten';
-                this.deleteConfirmMessage = 'Apakah Anda yakin ingin menghapus link ini? Data metrik dan skor SAW akan diperbarui.';
+                this.deleteConfirmMessage = 'Apakah Anda yakin ingin menghapus link ini? Data link akan dihapus permanen.';
             }
             this.deleteConfirmOpen = true;
         },

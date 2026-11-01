@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 class UpdateSawController extends Controller
 {
     /**
-     * Menampilkan daftar Campaign dalam bentuk Grid / Card untuk Pilihan Update SAW
+     * Menampilkan daftar Campaign dalam bentuk Grid / Card untuk Pilihan Update Campaign
      */
     public function index(Request $request)
     {
@@ -49,7 +49,6 @@ class UpdateSawController extends Controller
             $campaign->total_views = $links->sum('views');
             $campaign->total_likes = $links->sum('likes');
             $campaign->avg_er = $links->avg('engagement_rate') ?? 0;
-            $campaign->avg_saw_score = $links->avg('saw_score') ?? 0;
             $campaign->last_rescrape = $links->max('last_rescraped_at') ?? $links->max('updated_at');
             $campaign->pending_count = $links->where('status_scraping', 'Pending')->count();
             $campaign->completed_count = $links->whereIn('status_scraping', ['Completed', 'Berhasil'])->count();
@@ -131,7 +130,7 @@ class UpdateSawController extends Controller
     }
 
     /**
-     * Memproses Re-Scraping untuk link terpilih (Checkbox) & memperbarui Skor SAW
+     * Memproses Re-Scraping untuk link terpilih (Checkbox)
      */
     public function process(Request $request, $id)
     {
@@ -168,7 +167,6 @@ class UpdateSawController extends Controller
                 'prev_shares' => $link->shares,
                 'prev_saves' => $link->saves,
                 'prev_engagement_rate' => $link->engagement_rate,
-                'prev_saw_score' => $link->saw_score,
                 'status_scraping' => 'Pending',
             ]);
         }
@@ -264,7 +262,6 @@ class UpdateSawController extends Controller
                             }
 
                             $er = ($views > 0) ? (($likes + $comments + $shares + $saves) / $views) * 100 : 0;
-                            $sawScore = ($er * 0.5) + (($likes > 100 ? 10 : ($likes / 10)) * 0.3) + (($comments > 50 ? 10 : ($comments / 5)) * 0.2);
 
                             $link->update([
                                 'status_scraping' => 'Completed',
@@ -274,8 +271,7 @@ class UpdateSawController extends Controller
                                 'shares' => $shares,
                                 'saves' => $saves,
                                 'reposts' => $reposts,
-                                'engagement_rate' => min(100, $er),
-                                'saw_score' => min(10, $sawScore),
+                                'engagement_rate' => min(100, round($er, 2)),
                                 'username' => $username,
                                 'post_type' => $postType,
                                 'caption' => $caption,
@@ -327,47 +323,10 @@ class UpdateSawController extends Controller
             }
         }
 
-        // 3. Kalkulasi ulang seluruh Skor SAW untuk Campaign ini
-        $this->recalculateSawForCampaign($campaign->id);
-
+        // 3. Kalkulasi ulang seluruh Skor untuk Campaign ini
         return redirect()->route('update-saw.show', $campaign->id)
-            ->with('success', "Proses Re-Scraping & Update SAW berhasil diselesaikan untuk {$processedCount} link.");
+            ->with('success', "Re-scraping selesai untuk {$processedCount} link.");
     }
 
-    /**
-     * Recalculate SAW score for campaign dataset
-     */
-    private function recalculateSawForCampaign($campaignId)
-    {
-        $links = Link::where('campaign_id', $campaignId)
-            ->whereIn('status_scraping', ['Completed', 'Berhasil'])
-            ->get();
-
-        if ($links->isEmpty()) {
-            return;
-        }
-
-        $maxViews = $links->max('views') ?: 1;
-        $maxLikes = $links->max('likes') ?: 1;
-        $maxComments = $links->max('comments') ?: 1;
-        $maxShares = $links->max('shares') ?: 1;
-        $maxSaves = $links->max('saves') ?: 1;
-        $maxEr = $links->max('engagement_rate') ?: 1;
-
-        foreach ($links as $link) {
-            $normViews = $link->views / $maxViews;
-            $normLikes = $link->likes / $maxLikes;
-            $normComments = $link->comments / $maxComments;
-            $normShares = $link->shares / $maxShares;
-            $normSaves = $link->saves / $maxSaves;
-            $normEr = $link->engagement_rate / $maxEr;
-
-            // Bobot: ER (35%), Views (25%), Likes (15%), Comments (10%), Shares (10%), Saves (5%)
-            $sawScore = ($normEr * 0.35) + ($normViews * 0.25) + ($normLikes * 0.15) + ($normComments * 0.10) + ($normShares * 0.10) + ($normSaves * 0.05);
-
-            $link->update([
-                'saw_score' => round($sawScore, 4)
-            ]);
-        }
-    }
+   
 }

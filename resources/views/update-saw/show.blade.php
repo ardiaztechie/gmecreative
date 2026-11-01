@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="title">Pilih Konten & Re-Scrape SAW - {{ $campaign->nama_campaign }}</x-slot>
+        <x-slot name="title">Pilih Konten & Re-Scrape - {{ $campaign->nama_campaign }}</x-slot>
 
     @php
         $now = \Carbon\Carbon::now()->startOfDay();
