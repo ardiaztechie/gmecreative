@@ -143,6 +143,7 @@ class LinkController extends Controller
         ]);
 
         $insertedCount = 0;
+        $duplicateCount = 0;
 
         if ($request->type === 'single') {
             $request->validate([
@@ -157,17 +158,23 @@ class LinkController extends Controller
             $campaignObj = \App\Models\Campaign::find($request->campaign_id);
             $platform = $this->detectPlatform($url, $campaignObj->platform ?? null);
 
-            Link::create([
-                'campaign_id' => $request->campaign_id,
-                'kategori_konten_id' => $request->kategori_konten_id,
-                'kategori_creator_id' => $request->kategori_creator_id,
-                'url' => $url,
-                'platform' => $platform,
-                'tanggal_upload' => now()->toDateString(),
-                'status_scraping' => 'Pending'
-            ]);
+            $link = Link::firstOrCreate(
+                ['campaign_id' => $request->campaign_id, 'url' => $url],
+                [
+                    'kategori_konten_id'  => $request->kategori_konten_id,
+                    'kategori_creator_id' => $request->kategori_creator_id,
+                    'platform'            => $platform,
+                    'tanggal_upload'      => now()->toDateString(),
+                    'status_scraping'     => 'Pending',
+                ]
+            );
 
-            $insertedCount = 1;
+            if ($link->wasRecentlyCreated) {
+                $insertedCount = 1;
+            } else {
+                $duplicateCount = 1;
+            }
+
         } elseif ($request->type === 'bulk') {
             $request->validate([
                 'urls' => 'required|string',
@@ -181,18 +188,27 @@ class LinkController extends Controller
                 if ($url) {
                     $platform = $this->detectPlatform($url, $campaignObj->platform ?? null);
 
-                    Link::create([
-                        'campaign_id' => $request->campaign_id,
-                        'kategori_konten_id' => $request->kategori_konten_id,
-                        'kategori_creator_id' => $request->kategori_creator_id,
-                        'url' => $url,
-                        'platform' => $platform,
-                        'tanggal_upload' => now()->toDateString(),
-                        'status_scraping' => 'Pending'
-                    ]);
-                    $insertedCount++;
+                    $link = Link::firstOrCreate(
+                        //  1: kunci pencarian duplikat
+                        ['campaign_id' => $request->campaign_id, 'url' => $url],
+                        //  2: diisi hanya kalau baris baru dibuat
+                        [
+                            'kategori_konten_id'  => $request->kategori_konten_id,
+                            'kategori_creator_id' => $request->kategori_creator_id,
+                            'platform'            => $platform,
+                            'tanggal_upload'      => now()->toDateString(),
+                            'status_scraping'     => 'Pending',
+                        ]
+                    );
+
+                    if ($link->wasRecentlyCreated) {
+                        $insertedCount++;
+                    } else {
+                        $duplicateCount++;
+                    }
                 }
             }
+
         } elseif ($request->type === 'csv') {
             $request->validate([
                 'file' => 'required|file|max:10240',
@@ -489,7 +505,7 @@ class LinkController extends Controller
                 $saves = (int)($r['saves'] ?? 0);
                 $shares = (int)($r['shares'] ?? 0);
 
-                $er = ($views > 0) ? (($likes + $comments + $shares) / $views) * 100 : 0;
+                $er = ($views > 0) ? (($likes + $comments + $shares + $saves) / $views) * 100 : 0;
                 $statusScraping = 'Completed';
 
                 Link::updateOrCreate(
@@ -518,7 +534,6 @@ class LinkController extends Controller
             }
 
             if ($insertedCount > 0) {
-                $this->calculateSawScoresForCampaign($request->campaign_id);
                 $msg = "Berhasil memproses & menyimpan {$insertedCount} data link konten dari file Excel.";
                 if ($skippedPlatformCount > 0) {
                     $msg .= " ({$skippedPlatformCount} link dilewati karena jenis platform tidak sesuai dengan Campaign '{$campaignObj->nama_campaign}' - Platform: {$campaignObj->platform}).";
@@ -531,8 +546,17 @@ class LinkController extends Controller
             }
         }
 
-        return redirect()->route('operasional-konten.index')
-            ->with('success', "Berhasil memproses & menyimpan {$insertedCount} data link konten dari file.");
+                if ($insertedCount === 0 && $duplicateCount > 0) {
+            return redirect()->route('operasional-konten.index')
+                ->with('warning', "Tidak ada link baru. {$duplicateCount} link sudah ada di campaign ini.");
+        }
+
+        $message = "Berhasil memproses & menyimpan {$insertedCount} data link konten.";
+        if ($duplicateCount > 0) {
+            $message .= " ({$duplicateCount} link dilewati karena sudah ada di campaign ini.)";
+        }
+
+        return redirect()->route('operasional-konten.index')->with('success', $message);
     }
 
     /**
@@ -578,9 +602,10 @@ class LinkController extends Controller
     public function show($id)
     {
         $link = Link::with(['campaign', 'kategoriKonten', 'kategoriCreator'])->findOrFail($id);
-        if (request()->has('debug')) {
-            dd('Masuk ke halaman show!', $link->toArray());
-        }
+
+        // Tolak dengan error 403 jika user tidak berhak atas campaign link ini
+        abort_unless($this->canAccessCampaign($link->campaign_id), 403);
+
         return view('operasional-konten.show', compact('link'));
     }
 
@@ -591,18 +616,11 @@ class LinkController extends Controller
     {
         $link = Link::findOrFail($id);
 
-        // Security check: status Gagal cannot be edited
+        abort_unless($this->canAccessCampaign($link->campaign_id), 403);
+
+        // Link berstatus Gagal tidak boleh diedit manual
         if ($link->status_scraping === 'Gagal') {
             return redirect()->back()->with('error', 'Link dengan status Gagal tidak dapat diedit secara manual.');
-        }
-
-        // Check user access to this campaign
-        $user = auth()->user();
-        if ($user->hasRole('Admin')) {
-            $allowedIds = UserCampaignAccess::where('user_id', $user->id)->pluck('campaign_id')->toArray();
-            if (!in_array($link->campaign_id, $allowedIds)) {
-                return redirect()->back()->with('error', 'Maaf, Anda tidak memiliki akses ke campaign ini.');
-            }
         }
 
         $validated = $request->validate([
@@ -621,10 +639,10 @@ class LinkController extends Controller
         $shares = (int) $validated['shares'];
         $saves = (int) $validated['saves'];
 
-        // Calculate Engagement Rate: (Likes + Comments + Shares) / Views * 100
+        // Engagement Rate: (Likes + Comments + Shares + Saves) / Views * 100
         $er = 0;
         if ($views > 0) {
-            $er = (($likes + $comments + $shares) / $views) * 100;
+            $er = (($likes + $comments + $shares + $saves) / $views) * 100;
         }
 
         // If status was Pending, update status to Completed because metrics are now entered manually
@@ -643,9 +661,6 @@ class LinkController extends Controller
             'updated_at' => now(),
         ]);
 
-        // Recalculate SAW score for the campaign
-        $this->calculateSawScoresForCampaign($link->campaign_id);
-
         return redirect()->route('operasional-konten.index')
             ->with('success', "Berhasil memperbarui metrik engagement untuk link secara manual!");
     }
@@ -656,11 +671,10 @@ class LinkController extends Controller
     public function destroy($id)
     {
         $link = Link::findOrFail($id);
-        $campaignId = $link->campaign_id;
-        $link->delete();
 
-        // Hitung ulang SAW untuk campaign tersebut setelah data dihapus
-        $this->calculateSawScoresForCampaign($campaignId);
+        abort_unless($this->canAccessCampaign($link->campaign_id), 403);
+
+        $link->delete();
 
         return redirect()->back()->with('success', 'Link konten berhasil dihapus.');
     }
@@ -675,25 +689,24 @@ class LinkController extends Controller
             'ids.*' => 'exists:links,id'
         ]);
 
-        $links = Link::whereIn('id', $request->ids)->get();
+        // Hanya ambil link dari campaign yang boleh diakses user ini
+        $links = Link::whereIn('id', $request->ids)->get()
+            ->filter(fn($l) => $this->canAccessCampaign($l->campaign_id));
+
         $count = $links->count();
 
         if ($count === 0) {
             return redirect()->back()->with('error', 'Pilih minimal satu link untuk dihapus.');
         }
 
-        $campaignIds = $links->pluck('campaign_id')->unique();
-        Link::whereIn('id', $request->ids)->delete();
-
-        foreach ($campaignIds as $cId) {
-            $this->calculateSawScoresForCampaign($cId);
-        }
+        // Hapus berdasarkan ID hasil saringan, BUKAN $request->ids mentah
+        Link::whereIn('id', $links->pluck('id'))->delete();
 
         return redirect()->back()->with('success', "Berhasil menghapus {$count} link konten.");
     }
 
     /**
-     * Menjalankan Scraping Apify API untuk Link berstatus Pending dan Kalkulasi SAW
+     * Menjalankan Scraping Apify API untuk Link berstatus Pending 
      */
     public function refreshData(Request $request)
     {
@@ -702,6 +715,15 @@ class LinkController extends Controller
         @ini_set('memory_limit', '512M');
 
         $query = Link::where('status_scraping', 'Pending');
+
+        // Selain Admin Master, hanya proses link dari campaign yang boleh diakses
+        $user = Auth::user();
+        if (!($user->hasRole('Admin Master') || $user->role === 'Admin Master')) {
+            $allowedIds = ($user->hasRole('Admin') || $user->role === 'Admin')
+                ? UserCampaignAccess::where('user_id', $user->id)->pluck('campaign_id')
+                : Campaign::where('client_id', $user->id)->pluck('id');
+            $query->whereIn('campaign_id', $allowedIds);
+        }
 
         // Jika refresh dipicu untuk campaign tertentu
         if ($request->filled('campaign_id')) {
@@ -741,7 +763,6 @@ class LinkController extends Controller
 
         $successCount = 0;
         $errors = [];
-        $affectedCampaigns = [];
 
         foreach ($pendingLinks as $link) {
             try {
@@ -827,10 +848,7 @@ class LinkController extends Controller
                         $er = 0;
                         if ($views > 0) {
                             $er = (($likes + $comments + $shares + $saves) / $views) * 100;
-                        }
-
-                        // Calculate SAW Score
-                        $sawScore = ($er * 0.5) + (($likes > 100 ? 10 : ($likes / 10)) * 0.3) + (($comments > 50 ? 10 : ($comments / 5)) * 0.2);
+                        };
 
                         $link->update([
                             'status_scraping' => 'Completed',
@@ -841,7 +859,6 @@ class LinkController extends Controller
                             'saves' => $saves,
                             'reposts' => $reposts,
                             'engagement_rate' => min(100, $er),
-                            'saw_score' => min(10, $sawScore),
                             'username' => $username,
                             'post_type' => $postType,
                             'caption' => $caption,
@@ -851,7 +868,6 @@ class LinkController extends Controller
                             'updated_at' => now(),
                         ]);
 
-                        $affectedCampaigns[$link->campaign_id] = true;
                         $successCount++;
                     } else {
                         $link->update(['status_scraping' => 'Gagal']);
@@ -870,10 +886,7 @@ class LinkController extends Controller
             }
         }
 
-        // Kalkulasi Skor SAW untuk setiap campaign yang datanya baru terupdate
-        foreach (array_keys($affectedCampaigns) as $campaignId) {
-            $this->calculateSawScoresForCampaign($campaignId);
-        }
+
 
         $remainingPending = Link::where('status_scraping', 'Pending')->count();
 
@@ -895,7 +908,7 @@ class LinkController extends Controller
             return redirect()->back()->with('warning', "Berhasil memproses {$successCount} link, namun beberapa link gagal: " . implode(' | ', $errors));
         }
 
-        return redirect()->back()->with('success', "Sukses memproses {$successCount} link dan memperbarui ranking SAW!");
+        return redirect()->back()->with('success', "Sukses memproses {$successCount} link!");
     }
 
     /**
@@ -1104,45 +1117,33 @@ class LinkController extends Controller
     }
 
     /**
-     * Perhitungan Algoritma SAW (Simple Additive Weighting) per Campaign
-     * Bobot: Share 35%, Comment 25%, Like 20%, View 10%, Save 10%
+     * Apakah user yang sedang login boleh mengakses campaign ini?
+     * Dipakai oleh show, update, destroy, dan destroyBulk.
      */
-    private function calculateSawScoresForCampaign(int $campaignId): void
+    private function canAccessCampaign(int $campaignId): bool
     {
-        $links = Link::where('campaign_id', $campaignId)
-            ->whereIn('status_scraping', ['Completed', 'Berhasil'])
-            ->get();
+        $user = Auth::user();
 
-        if ($links->isEmpty()) {
-            return;
+        // Admin Master: boleh semua campaign
+        if ($user->hasRole('Admin Master') || $user->role === 'Admin Master') {
+            return true;
         }
 
-        // Ambil nilai maksimum kriteria benefit
-        $maxShare = $links->max('shares') ?: 1;
-        $maxComment = $links->max('comments') ?: 1;
-        $maxLike = $links->max('likes') ?: 1;
-        $maxView = $links->max('views') ?: 1;
-        $maxSave = $links->max('saves') ?: 1;
-
-        foreach ($links as $link) {
-            // Normalisasi Matriks R
-            $rShare = $link->shares / $maxShare;
-            $rComment = $link->comments / $maxComment;
-            $rLike = $link->likes / $maxLike;
-            $rView = $link->views / $maxView;
-            $rSave = $link->saves / $maxSave;
-
-            // Hitung Preferensi SAW (V_i)
-            $sawScore = (0.35 * $rShare) + 
-                        (0.25 * $rComment) + 
-                        (0.20 * $rLike) + 
-                        (0.10 * $rView) + 
-                        (0.10 * $rSave);
-
-            $link->update([
-                'saw_score' => round($sawScore, 4)
-            ]);
+        // Admin: hanya campaign yang ditugaskan (tabel user_campaign_access)
+        if ($user->hasRole('Admin') || $user->role === 'Admin') {
+            return UserCampaignAccess::where('user_id', $user->id)
+                ->where('campaign_id', $campaignId)
+                ->exists();
         }
+
+        // Client: hanya campaign miliknya (kolom campaigns.client_id)
+        if ($user->hasRole('Client') || $user->role === 'Client') {
+            return Campaign::where('id', $campaignId)
+                ->where('client_id', $user->id)
+                ->exists();
+        }
+
+        return false; 
     }
 
     /**
