@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'apify' => [
+        'token'        => env('APIFY_TOKEN', env('APIFY_API_TOKEN')),
+        'tiktok_actor' => env('APIFY_TIKTOK_ACTOR', env('APIFY_TIKTOK_ACTOR_ID', 'clockworks/free-tiktok-scraper')),
+        'ig_actor'     => env('APIFY_IG_ACTOR', env('APIFY_INSTAGRAM_ACTOR_ID', 'apify/instagram-scraper')),
+    ],
+
 ];

@@ -172,9 +172,9 @@ class UpdateSawController extends Controller
         }
 
         // 2. Jalankan Scraping Apify secara langsung
-        $token = env('APIFY_TOKEN', env('APIFY_API_TOKEN'));
-        $rawTiktokActor = env('APIFY_TIKTOK_ACTOR', env('APIFY_TIKTOK_ACTOR_ID', 'clockworks/free-tiktok-scraper'));
-        $rawIgActor = env('APIFY_IG_ACTOR', env('APIFY_INSTAGRAM_ACTOR_ID', 'apify/instagram-scraper'));
+        $token = config('services.apify.token');
+        $rawTiktokActor = config('services.apify.tiktok_actor');
+        $rawIgActor = config('services.apify.ig_actor');
 
         $tiktokActorId = str_replace('/', '~', $rawTiktokActor);
         $igActorId = str_replace('/', '~', $rawIgActor);
