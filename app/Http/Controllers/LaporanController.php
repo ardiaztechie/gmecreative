@@ -18,11 +18,7 @@ class LaporanController extends Controller
             $campaignIds = $campaigns->pluck('id');
         } elseif ($user->hasRole('Admin') || $user->role === 'Admin') {
             $accessIds = \App\Models\UserCampaignAccess::where('user_id', $user->id)->pluck('campaign_id');
-            if ($accessIds->count() > 0) {
-                $campaigns = Campaign::whereIn('id', $accessIds)->get();
-            } else {
-                $campaigns = Campaign::all();
-            }
+            $campaigns = Campaign::whereIn('id', $accessIds)->get();
             $campaignIds = $campaigns->pluck('id');
         } elseif ($user->hasRole('Client') || $user->role === 'Client') {
             $campaigns = Campaign::where('client_id', $user->id)->get();

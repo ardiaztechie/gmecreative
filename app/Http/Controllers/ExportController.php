@@ -17,12 +17,7 @@ class ExportController extends Controller
         if ($user->hasRole('Admin Master') || $user->role === 'Admin Master') {
             $campaignIds = Campaign::pluck('id');
         } elseif ($user->hasRole('Admin') || $user->role === 'Admin') {
-            $accessIds = \App\Models\UserCampaignAccess::where('user_id', $user->id)->pluck('campaign_id');
-            if ($accessIds->count() > 0) {
-                $campaignIds = $accessIds;
-            } else {
-                $campaignIds = Campaign::pluck('id');
-            }
+            $campaignIds = \App\Models\UserCampaignAccess::where('user_id', $user->id)->pluck('campaign_id');
         } elseif ($user->hasRole('Client') || $user->role === 'Client') {
             $campaignIds = Campaign::where('client_id', $user->id)->pluck('id');
         } else {
