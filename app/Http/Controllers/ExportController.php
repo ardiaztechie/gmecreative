@@ -12,7 +12,7 @@ class ExportController extends Controller
 {
     private function getExportLinks()
     {
-        $user = Auth::user();
+        $user = $this->authUser();
 
         if ($user->hasRole('Admin Master') || $user->role === 'Admin Master') {
             $campaignIds = Campaign::pluck('id');
@@ -52,7 +52,7 @@ class ExportController extends Controller
     public function clientPdf()
     {
         $links = $this->getExportLinks();
-        
+
         $period = null;
         if (request()->filled('start_date') || request()->filled('end_date')) {
             $startStr = request('start_date') ? \Carbon\Carbon::parse(request('start_date'))->format('d/m/Y') : 'Awal';
@@ -61,7 +61,7 @@ class ExportController extends Controller
         }
 
         $data = [
-            'title' => 'Laporan Engagement Konten - ' . Auth::user()->name,
+            'title' => 'Laporan Engagement Konten - ' . $this->authUser()->name,
             'date' => date('d M Y'),
             'period' => $period,
             'links' => $links,
@@ -69,8 +69,8 @@ class ExportController extends Controller
 
         // Ensure you have run: composer require barryvdh/laravel-dompdf
         $pdf = Pdf::loadView('exports.client-pdf', $data)->setPaper('a4', 'landscape');
-        
-        return $pdf->download('laporan-engagement-'.date('Ymd').'.pdf');
+
+        return $pdf->download('laporan-engagement-' . date('Ymd') . '.pdf');
     }
 
     public function clientExcel()
@@ -89,11 +89,11 @@ class ExportController extends Controller
 
         $columns = ['No', 'Tanggal', 'Platform', 'Campaign', 'Akun', 'Kategori', 'URL', 'Views', 'Likes', 'Comments', 'Shares', 'Saves', 'Engagement Rate (%)', 'Status'];
 
-        $callback = function() use($links, $columns) {
+        $callback = function () use ($links, $columns) {
             $file = fopen('php://output', 'w');
             // Write UTF-8 BOM for Excel compatibility
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
             fputcsv($file, $columns);
 
             foreach ($links as $index => $link) {

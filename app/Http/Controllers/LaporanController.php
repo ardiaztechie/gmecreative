@@ -11,7 +11,7 @@ class LaporanController extends Controller
 {
     public function index(Request $request)
     {
-        $user = Auth::user();
+        $user = $this->authUser();
 
         if ($user->hasRole('Admin Master') || $user->role === 'Admin Master') {
             $campaigns = Campaign::all();
@@ -67,7 +67,7 @@ class LaporanController extends Controller
 
     public function show($id)
     {
-        $user = Auth::user();
+        $user = $this->authUser();
 
         $link = Link::with(['campaign', 'kategoriKonten', 'kategoriCreator'])->findOrFail($id);
 

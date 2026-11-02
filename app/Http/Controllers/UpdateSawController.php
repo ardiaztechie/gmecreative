@@ -15,7 +15,7 @@ class UpdateSawController extends Controller
      */
     public function index(Request $request)
     {
-        $user = Auth::user();
+        $user = $this->authUser();
         $query = Campaign::withCount('links');
 
         // Scope filter berdasarkan Role User
@@ -34,9 +34,9 @@ class UpdateSawController extends Controller
             $platform = $request->platform;
             $query->where(function ($q) use ($platform) {
                 $q->where('platform', $platform)
-                  ->orWhereHas('links', function ($l) use ($platform) {
-                      $l->where('platform', $platform);
-                  });
+                    ->orWhereHas('links', function ($l) use ($platform) {
+                        $l->where('platform', $platform);
+                    });
             });
         }
 
@@ -62,7 +62,7 @@ class UpdateSawController extends Controller
      */
     public function show($id, Request $request)
     {
-        $user = Auth::user();
+        $user = $this->authUser();
         $campaign = Campaign::findOrFail($id);
 
         if (($user->hasRole('Client') || $user->role === 'Client') && $campaign->client_id !== $user->id) {
@@ -86,28 +86,28 @@ class UpdateSawController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('url', 'like', "%{$search}%")
-                  ->orWhere('username', 'like', "%{$search}%")
-                  ->orWhere('caption', 'like', "%{$search}%");
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('caption', 'like', "%{$search}%");
             });
         }
 
         if ($request->filled('start_date')) {
             $query->where(function ($q) use ($request) {
                 $q->whereDate('tanggal_upload', '>=', $request->start_date)
-                  ->orWhere(function ($sub) use ($request) {
-                      $sub->whereNull('tanggal_upload')
-                          ->whereDate('updated_at', '>=', $request->start_date);
-                  });
+                    ->orWhere(function ($sub) use ($request) {
+                        $sub->whereNull('tanggal_upload')
+                            ->whereDate('updated_at', '>=', $request->start_date);
+                    });
             });
         }
 
         if ($request->filled('end_date')) {
             $query->where(function ($q) use ($request) {
                 $q->whereDate('tanggal_upload', '<=', $request->end_date)
-                  ->orWhere(function ($sub) use ($request) {
-                      $sub->whereNull('tanggal_upload')
-                          ->whereDate('updated_at', '<=', $request->end_date);
-                  });
+                    ->orWhere(function ($sub) use ($request) {
+                        $sub->whereNull('tanggal_upload')
+                            ->whereDate('updated_at', '<=', $request->end_date);
+                    });
             });
         }
 
@@ -122,9 +122,9 @@ class UpdateSawController extends Controller
         }
 
         $links = $query->orderByRaw("COALESCE(tanggal_upload, DATE(updated_at)) {$sortDir}")
-                       ->orderBy('id', $sortDir)
-                       ->paginate($perPage)
-                       ->withQueryString();
+            ->orderBy('id', $sortDir)
+            ->paginate($perPage)
+            ->withQueryString();
 
         return view('update-saw.show', compact('campaign', 'links'));
     }
@@ -327,6 +327,4 @@ class UpdateSawController extends Controller
         return redirect()->route('update-saw.show', $campaign->id)
             ->with('success', "Re-scraping selesai untuk {$processedCount} link.");
     }
-
-   
 }

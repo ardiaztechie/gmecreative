@@ -11,7 +11,7 @@ class DashboardController extends Controller
 {
     private function getDashboardData(Request $request)
     {
-        $user = Auth::user();
+        $user = $this->authUser();
 
         if ($user->hasRole('Admin Master') || $user->role === 'Admin Master') {
             $campaigns = Campaign::all();
@@ -72,7 +72,7 @@ class DashboardController extends Controller
 
         // Top 5 Campaigns by Views (matching date filters)
         $topCampaigns = Campaign::whereIn('id', $campaignIds)
-            ->withSum(['links' => function($q) use($request) {
+            ->withSum(['links' => function ($q) use ($request) {
                 if ($request->filled('platform')) $q->where('platform', $request->platform);
                 if ($request->filled('start_date')) $q->whereDate('tanggal_upload', '>=', $request->start_date);
                 if ($request->filled('end_date')) $q->whereDate('tanggal_upload', '<=', $request->end_date);
@@ -133,8 +133,24 @@ class DashboardController extends Controller
             ->pluck('year');
 
         return compact(
-            'campaigns', 'totalCampaigns', 'totalLinks', 'totalViews', 'totalLikes', 'totalComments', 'totalShares', 'totalSaves', 'avgER', 'totalViewsIncrease',
-            'topCampaigns', 'platformViews', 'platformLikes', 'platformComments', 'topContent', 'viewsTrendData', 'links', 'availableYears'
+            'campaigns',
+            'totalCampaigns',
+            'totalLinks',
+            'totalViews',
+            'totalLikes',
+            'totalComments',
+            'totalShares',
+            'totalSaves',
+            'avgER',
+            'totalViewsIncrease',
+            'topCampaigns',
+            'platformViews',
+            'platformLikes',
+            'platformComments',
+            'topContent',
+            'viewsTrendData',
+            'links',
+            'availableYears'
         );
     }
 

@@ -17,13 +17,13 @@ use Exception;
 class LinkController extends Controller
 {
 
-    
+
     /**
      * Menampilkan daftar link konten dan form input operasional
      */
     public function index(Request $request)
     {
-        $user = Auth::user();
+        $user = $this->authUser();
         $kategoriKonten = KategoriKonten::orderBy('nama', 'asc')->get();
         $kategoriCreator = KategoriCreator::orderBy('nama', 'asc')->get();
 
@@ -41,7 +41,7 @@ class LinkController extends Controller
         $campaignIds = $campaigns->pluck('id');
 
         $query = Link::with(['campaign', 'kategoriKonten', 'kategoriCreator']);
- 
+
         // Scope data link sesuai campaign yang bisa diakses user
         if (!($user->hasRole('Admin Master') || $user->role === 'Admin Master')) {
             $query->whereIn('links.campaign_id', $campaignIds);
@@ -54,7 +54,7 @@ class LinkController extends Controller
 
         // Urutkan otomatis berdasarkan Tanggal Upload (default: dari terbaru ke terlama)
         $query->orderByRaw("COALESCE(links.tanggal_upload, DATE(links.updated_at)) {$sortDir}")
-              ->orderBy('links.id', $sortDir);
+            ->orderBy('links.id', $sortDir);
 
         // Filter Campaign jika dipilih
         if ($request->filled('campaign_id')) {
@@ -71,8 +71,8 @@ class LinkController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('url', 'like', "%{$search}%")
-                  ->orWhere('username', 'like', "%{$search}%")
-                  ->orWhere('caption', 'like', "%{$search}%");
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('caption', 'like', "%{$search}%");
             });
         }
 
@@ -80,20 +80,20 @@ class LinkController extends Controller
         if ($request->filled('start_date')) {
             $query->where(function ($q) use ($request) {
                 $q->whereDate('tanggal_upload', '>=', $request->start_date)
-                  ->orWhere(function ($sub) use ($request) {
-                      $sub->whereNull('tanggal_upload')
-                          ->whereDate('updated_at', '>=', $request->start_date);
-                  });
+                    ->orWhere(function ($sub) use ($request) {
+                        $sub->whereNull('tanggal_upload')
+                            ->whereDate('updated_at', '>=', $request->start_date);
+                    });
             });
         }
 
         if ($request->filled('end_date')) {
             $query->where(function ($q) use ($request) {
                 $q->whereDate('tanggal_upload', '<=', $request->end_date)
-                  ->orWhere(function ($sub) use ($request) {
-                      $sub->whereNull('tanggal_upload')
-                          ->whereDate('updated_at', '<=', $request->end_date);
-                  });
+                    ->orWhere(function ($sub) use ($request) {
+                        $sub->whereNull('tanggal_upload')
+                            ->whereDate('updated_at', '<=', $request->end_date);
+                    });
             });
         }
 
@@ -118,7 +118,7 @@ class LinkController extends Controller
      */
     public function store(Request $request)
     {
-        $user = Auth::user();
+        $user = $this->authUser();
 
         // Validasi akses ke campaign
         if (!($user->hasRole('Admin Master') || $user->role === 'Admin Master')) {
@@ -180,7 +180,6 @@ class LinkController extends Controller
             ]);
 
             $insertedCount = 1;
-
         } elseif ($request->type === 'bulk') {
             $request->validate([
                 'urls' => 'required|string',
@@ -213,7 +212,6 @@ class LinkController extends Controller
                     $insertedCount++;
                 }
             }
-
         } elseif ($request->type === 'csv') {
             $request->validate([
                 'file' => 'required|file|max:10240',
@@ -367,7 +365,7 @@ class LinkController extends Controller
                         preg_match_all('/<(?:td|th)[^>]*>(.*?)<\/(?:td|th)>/is', $trContent, $cellMatches);
                         if (empty($cellMatches[1])) continue;
 
-                        $rowCells = array_map(function($c) {
+                        $rowCells = array_map(function ($c) {
                             $decoded = html_entity_decode($c, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                             return trim(preg_replace('/\s+/', ' ', strip_tags($decoded)));
                         }, $cellMatches[1]);
@@ -416,7 +414,7 @@ class LinkController extends Controller
 
                     $delimiter = str_contains($line, ';') ? ';' : (str_contains($line, "\t") ? "\t" : ',');
                     $rawCells = str_getcsv($line, $delimiter);
-                    $rowCells = array_map(function($c) {
+                    $rowCells = array_map(function ($c) {
                         $decoded = html_entity_decode($c, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                         return trim(preg_replace('/\s+/', ' ', strip_tags($decoded)));
                     }, $rawCells);
@@ -565,7 +563,7 @@ class LinkController extends Controller
             }
         }
 
-                if ($insertedCount === 0 && $duplicateCount > 0) {
+        if ($insertedCount === 0 && $duplicateCount > 0) {
             return redirect()->route('operasional-konten.index')
                 ->with('warning', "Tidak ada link baru. {$duplicateCount} link sudah ada di campaign ini.");
         }
@@ -597,14 +595,14 @@ class LinkController extends Controller
         $callback = function () {
             $file = fopen('php://output', 'w');
             // UTF-8 BOM & sep directive for seamless Microsoft Excel opening
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
             fwrite($file, "sep=,\n");
 
             fputcsv($file, ['No', 'Tgl Upload', 'Account', 'Link Content (TikTok / Instagram) *Wajib', 'Views', 'Likes', 'Comment', 'Save', 'Share']);
             fputcsv($file, ['1', 'Sabtu, 08 Agustus 2026', 'Ruang Bercerita', 'https://vt.tiktok.com/ZS4sj89A1/', '398900', '5329', '69', '284', '463']);
             fputcsv($file, ['2', 'Minggu, 09 Agustus 2026', 'Area Cerita', 'https://www.tiktok.com/@haloiniakimm/video/7677116573420621076', '7381', '120', '15', '8', '12']);
             fputcsv($file, ['3', 'Rabu, 12 Agustus 2026', 'Inspirasi Harian', 'https://www.instagram.com/p/Cxyz123456/', '45200', '1850', '42', '110', '95']);
-            
+
             for ($i = 4; $i <= 10; $i++) {
                 fputcsv($file, [(string)$i, '', '', '', '', '', '', '', '']);
             }
@@ -736,7 +734,7 @@ class LinkController extends Controller
         $query = Link::where('status_scraping', 'Pending');
 
         // Selain Admin Master, hanya proses link dari campaign yang boleh diakses
-        $user = Auth::user();
+        $user = $this->authUser();
         if (!($user->hasRole('Admin Master') || $user->role === 'Admin Master')) {
             $allowedIds = ($user->hasRole('Admin') || $user->role === 'Admin')
                 ? UserCampaignAccess::where('user_id', $user->id)->pluck('campaign_id')
@@ -842,10 +840,10 @@ class LinkController extends Controller
                             $comments = (int) ($item['commentsCount'] ?? $item['commentCount'] ?? $item['comments'] ?? 0);
                             $shares = (int) ($item['sharesCount'] ?? $item['shareCount'] ?? $item['shares'] ?? 0);
                             $saves = (int) ($item['savesCount'] ?? $item['saveCount'] ?? $item['saves'] ?? $item['bookmarkCount'] ?? 0);
-                            
+
                             $postType = $item['type'] ?? $item['product_type'] ?? null;
                             $caption = $item['caption'] ?? $item['text'] ?? null;
-                            
+
                             if (isset($item['timestamp'])) {
                                 $postDate = date('Y-m-d H:i:s', strtotime($item['timestamp']));
                             } elseif (isset($item['created_at'])) {
@@ -1055,11 +1053,22 @@ class LinkController extends Controller
         $clean = trim((string)$dateStr);
 
         $indoMonths = [
-            'Januari' => 'January', 'Februari' => 'February', 'Maret' => 'March',
-            'April' => 'April', 'Mei' => 'May', 'Juni' => 'June',
-            'Juli' => 'July', 'Agustus' => 'August', 'September' => 'September',
-            'Oktober' => 'October', 'November' => 'November', 'Desember' => 'December',
-            'Agus' => 'August', 'Okto' => 'October', 'Nop' => 'November', 'Des' => 'December'
+            'Januari' => 'January',
+            'Februari' => 'February',
+            'Maret' => 'March',
+            'April' => 'April',
+            'Mei' => 'May',
+            'Juni' => 'June',
+            'Juli' => 'July',
+            'Agustus' => 'August',
+            'September' => 'September',
+            'Oktober' => 'October',
+            'November' => 'November',
+            'Desember' => 'December',
+            'Agus' => 'August',
+            'Okto' => 'October',
+            'Nop' => 'November',
+            'Des' => 'December'
         ];
 
         foreach ($indoMonths as $indo => $eng) {
@@ -1103,33 +1112,33 @@ class LinkController extends Controller
             return null; // Lewati jika tidak ada URL TikTok / Instagram
         }
 
-        $username = isset($headerMap['username']) && isset($rowCells[$headerMap['username']]) 
-            ? trim(strip_tags($rowCells[$headerMap['username']])) 
+        $username = isset($headerMap['username']) && isset($rowCells[$headerMap['username']])
+            ? trim(strip_tags($rowCells[$headerMap['username']]))
             : null;
 
-        $tglRaw = isset($headerMap['tanggal_upload']) && isset($rowCells[$headerMap['tanggal_upload']]) 
-            ? $rowCells[$headerMap['tanggal_upload']] 
+        $tglRaw = isset($headerMap['tanggal_upload']) && isset($rowCells[$headerMap['tanggal_upload']])
+            ? $rowCells[$headerMap['tanggal_upload']]
             : null;
         $tanggalUpload = $this->parseUploadedDate($tglRaw);
 
-        $views = isset($headerMap['views']) && isset($rowCells[$headerMap['views']]) 
-            ? $this->parseFormattedNumber($rowCells[$headerMap['views']]) 
+        $views = isset($headerMap['views']) && isset($rowCells[$headerMap['views']])
+            ? $this->parseFormattedNumber($rowCells[$headerMap['views']])
             : 0;
 
-        $likes = isset($headerMap['likes']) && isset($rowCells[$headerMap['likes']]) 
-            ? $this->parseFormattedNumber($rowCells[$headerMap['likes']]) 
+        $likes = isset($headerMap['likes']) && isset($rowCells[$headerMap['likes']])
+            ? $this->parseFormattedNumber($rowCells[$headerMap['likes']])
             : 0;
 
-        $comments = isset($headerMap['comments']) && isset($rowCells[$headerMap['comments']]) 
-            ? $this->parseFormattedNumber($rowCells[$headerMap['comments']]) 
+        $comments = isset($headerMap['comments']) && isset($rowCells[$headerMap['comments']])
+            ? $this->parseFormattedNumber($rowCells[$headerMap['comments']])
             : 0;
 
-        $saves = isset($headerMap['saves']) && isset($rowCells[$headerMap['saves']]) 
-            ? $this->parseFormattedNumber($rowCells[$headerMap['saves']]) 
+        $saves = isset($headerMap['saves']) && isset($rowCells[$headerMap['saves']])
+            ? $this->parseFormattedNumber($rowCells[$headerMap['saves']])
             : 0;
 
-        $shares = isset($headerMap['shares']) && isset($rowCells[$headerMap['shares']]) 
-            ? $this->parseFormattedNumber($rowCells[$headerMap['shares']]) 
+        $shares = isset($headerMap['shares']) && isset($rowCells[$headerMap['shares']])
+            ? $this->parseFormattedNumber($rowCells[$headerMap['shares']])
             : 0;
 
         return [
@@ -1150,7 +1159,7 @@ class LinkController extends Controller
      */
     private function canAccessCampaign(int $campaignId): bool
     {
-        $user = Auth::user();
+        $user = $this->authUser();
 
         // Admin Master: boleh semua campaign
         if ($user->hasRole('Admin Master') || $user->role === 'Admin Master') {
@@ -1171,7 +1180,7 @@ class LinkController extends Controller
                 ->exists();
         }
 
-        return false; 
+        return false;
     }
 
     /**
@@ -1198,10 +1207,10 @@ class LinkController extends Controller
                 $username = $userData['username'] ?? ($userData['email'] ?? 'User Apify');
                 $planName = $userData['plan']['name'] ?? ($userData['plan']['id'] ?? 'Free');
 
-                $maxUsageUsd = (float)($userData['plan']['maxMonthlyUsageUsd'] 
+                $maxUsageUsd = (float)($userData['plan']['maxMonthlyUsageUsd']
                     ?? ($userData['limits']['monthlyUsageUsd'] ?? 5.00));
-                    
-                $currentUsageUsd = (float)($userData['monthlyUsage']['totalUsageUsd'] 
+
+                $currentUsageUsd = (float)($userData['monthlyUsage']['totalUsageUsd']
                     ?? ($userData['stats']['usageUsd'] ?? 0.00));
 
                 if (!isset($userData['monthlyUsage']['totalUsageUsd'])) {
