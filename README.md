@@ -1,14 +1,14 @@
 # 🚀 Kahfi Engagement - Campaign & Social Media Analytics System
 
-**Kahfi Engagement** adalah platform manajemen kampanye media sosial dan analisis *engagement rate* berbasis metode **Simple Additive Weighting (SAW)**. Sistem ini dirancang untuk mengelola operasional konten, otomatisasi *re-scraping* data metrik (TikTok & Instagram), visualisasi analytics, serta manajemen hak akses pengguna berbasis **Role-Based Access Control (RBAC)**.
+**Kahfi Engagement** adalah platform manajemen kampanye media sosial dan analisis *engagement rate*. Sistem ini dirancang untuk mengelola operasional konten, pengambilan dan pembaruan ulang (*scraping* dan *re-scraping*) data metrik TikTok & Instagram melalui Apify, visualisasi analytics, serta manajemen hak akses pengguna berbasis **Role-Based Access Control (RBAC)**.
 
 ---
 
 ## 📌 Fitur Utama
 
-- 📊 **Dashboard Monitoring Real-time**: 8 Card Metrik Ringkas (Tayangan/Views, Likes, Comments, Shares, Saves, Engagement Rate %, dan Skor SAW).
+- 📊 **Dashboard Monitoring**: Card metrik ringkas (Tayangan/Views, Likes, Comments, Shares, Saves, dan Engagement Rate %), grafik tren, perbandingan platform, dan ranking konten teratas (berdasarkan views).
 - 🔍 **Multi-Filtering System**: Filter interaktif berdasarkan **Platform** (TikTok/Instagram), **Campaign**, **Tahun**, **Bulan**, dan **Hari**.
-- 🔄 **Update Campaign SAW & Re-scraping**:
+- 🔄 **Update Campaign & Re-scraping**:
   - Tampilan grid compact 4-column dengan paginasi.
   - Indikator sisa waktu (*countdown timer*) masa aktif campaign.
   - Seleksi massal (Bulk Selection) link untuk re-scraping otomatis via **Apify**.
@@ -16,8 +16,8 @@
 - 🔐 **Role-Based Access Control (RBAC)**:
   - Fleksibilitas pengaturan hak akses menu & fitur per Role menggunakan `spatie/laravel-permission`.
   - Pembatasan khusus akses campaign per user Admin (`UserCampaignAccess`).
-- 📁 **Operasional Konten & Link**: Manajemen data link postingan, integrasi kategori creator & konten.
-- 📄 **Export Laporan**: Fitur ekspor laporan metrik engagement ke format **PDF (Landscape)** & **Excel**.
+- 📁 **Operasional Konten & Link**: Input link secara Single, Bulk, atau unggah file CSV/Excel; satu URL hanya boleh terdaftar pada satu campaign; integrasi kategori creator & konten.
+- 📄 **Export Laporan**: Fitur ekspor laporan metrik engagement ke format **PDF (Landscape)** & **Excel (CSV)**.
 - 🎨 **Modern UI/UX**: Garis indikator loading otomatis (**NProgress**), Modal dialog & Toast Notification modern (**SweetAlert2**).
 
 ---
@@ -39,8 +39,8 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek dari repositori baru (clo
 ### 1. Clone Repositori
 
 ```bash
-git clone <repository-url>
-cd kahfi-engagement
+git clone https://github.com/ardiaztechie/gmecreative.git
+cd gmecreative
 ```
 
 ### 2. Install Dependensi PHP (Composer)
@@ -66,7 +66,8 @@ cp .env.example .env
 *Catatan pada Windows PowerShell:*
 
 ```powershell
-copy .env.example .env
+git add .env.example
+git diff --cached .env.example
 ```
 
 Buka file `.env` dan atur konfigurasi database serta Apify Token Anda:
@@ -81,6 +82,9 @@ DB_PASSWORD=
 
 # Apify Scraping Configuration
 APIFY_TOKEN=your_apify_api_token_here
+# Opsional: nama actor Apify (sudah ada nilai bawaan)
+APIFY_TIKTOK_ACTOR=clockworks/free-tiktok-scraper
+APIFY_IG_ACTOR=apify/instagram-scraper
 ```
 
 ### 5. Generate Application Key
@@ -96,6 +100,8 @@ Jalankan perintah berikut untuk membuat struktur tabel dan mengisi data awal Rol
 ```bash
 php artisan migrate:fresh --seed
 ```
+
+> ⚠️ **Peringatan:** `migrate:fresh` menghapus SELURUH tabel beserta isinya. Pakai hanya pada instalasi baru atau lingkungan pengembangan. Pada database yang sudah berisi data, cukup jalankan `php artisan migrate`.
 
 ### 7. Buat Symbolic Link Storage
 
@@ -127,11 +133,15 @@ Buka browser dan akses aplikasi di: `http://127.0.0.1:8000`
 
 Setelah menjalankan `php artisan db:seed` / `migrate:fresh --seed`, akun berikut siap digunakan:
 
-| Role                   | Email                 | Password     | Hak Akses Utama                                          |
-| :--------------------- | :-------------------- | :----------- | :------------------------------------------------------- |
-| **Admin Master** | `admin@master.com`  | `password` | Full Akses ke seluruh sistem, RBAC, dan User Access      |
-| **Admin**        | `admin@admin.com`   | `password` | Operasional Konten, Update SAW, Kelola Campaign, Laporan |
-| **Client**       | `client@client.com` | `password` | Hanya dapat melihat Campaign & Laporan milik sendiri     |
+Login menggunakan **username** dan password (bukan email).
+
+| Role             | Username        | Email               | Password   | Hak Akses Utama                                                                   |
+| :--------------- | :-------------- | :------------------ | :--------- | :-------------------------------------------------------------------------------- |
+| **Admin Master** | `adminmaster`   | `admin@master.com`  | `password` | Full akses ke seluruh sistem, RBAC, dan User Access                               |
+| **Admin**        | `admin123`      | `admin@admin.com`   | `password` | Dashboard, Operasional Konten (input link), Laporan, hanya pada campaign yang ditugaskan |
+| **Client**       | `client123`     | `client@client.com` | `password` | Dashboard, Campaign & Laporan milik sendiri                                       |
+
+> ⚠️ Akun di atas hanya untuk pengembangan. Karena repositori ini publik, **ganti password semua akun sebelum dipakai di server nyata**.
 
 ---
 
@@ -146,7 +156,7 @@ Sistem menggunakan paket **Spatie Laravel-Permission**.
 - `roles.view`, `roles.create`, `roles.edit`, `roles.delete`
 - `campaigns.view`, `campaigns.create`, `campaigns.edit`, `campaigns.delete`
 - `operasional-konten.view`, `operasional-konten.create`, `operasional-konten.delete`
-- `update-saw.view`, `update-saw.process`
+- `update-saw.view`, `update-saw.process` (halaman Update Campaign / re-scraping; nama permission masih memakai penamaan awal)
 - `master-data.view`
 - `laporan.view`
 - `profile.edit`
@@ -156,7 +166,7 @@ Sistem menggunakan paket **Spatie Laravel-Permission**.
 1. Login sebagai **Admin Master**.
 2. Buka menu **Master Data** -> **Roles & Hak Akses**.
 3. Pilih role yang ingin diubah lalu klik **Edit**.
-4. Centang / Hilangkan centang permission yang diinginkan (misal: `update-saw.view`).
+4. Centang / Hilangkan centang permission yang diinginkan (misal: `laporan.view`).
 5. Simpan perubahan. Menu & halaman yang tidak di-centang otomatis disembunyikan dan diuji dengan HTTP 403 Forbidden Middleware.
 
 ---
@@ -164,18 +174,17 @@ Sistem menggunakan paket **Spatie Laravel-Permission**.
 ## 📁 Struktur Direktori Utama
 
 ```
-kahfi-engagement/
+gmecreative/
 ├── app/
-│   ├── Http/Controllers/    # Controller Dashboard, SAW, Link, User, Role, Export
-│   ├── Models/              # Eloquent Models (Campaign, Link, User, dll)
-│   └── Services/            # Service integrasi Apify Scraping
+│   ├── Http/Controllers/    # Dashboard, Link (input & scraping Apify), Update Campaign, Campaign, User, Role, Laporan, Export
+│   └── Models/              # Eloquent Models (Campaign, Link, User, dll)
 ├── database/
 │   ├── migrations/          # Tabel DB & Schema
 │   └── seeders/             # PermissionSeeder & DatabaseSeeder
 ├── resources/
 │   ├── css/                 # Styling Tailwind & Custom Theme
 │   ├── js/                  # Alpine.js & Custom Logic
-│   └── views/               # Blade Templates (Dashboard, SAW, Laporan, Layouts)
+│   └── views/               # Blade Templates (Dashboard, Update Campaign, Laporan, Layouts)
 ├── routes/
 │   └── web.php              # Definisi Route & Middleware Permission
 └── README.md

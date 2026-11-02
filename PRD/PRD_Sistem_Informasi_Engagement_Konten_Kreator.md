@@ -4,7 +4,7 @@
 ---
 
 ## 1. Overview & Project Goals
-Sistem Informasi Manajemen Engagement Konten Kreator adalah platform berbasis web (Laravel) yang dirancang untuk mengotomatisasi pencatatan, pemantauan performa konten (TikTok & Instagram), integrasi *scraping engine* (Apify API), serta perankingan performa konten menggunakan metode **Simple Additive Weighting (SAW)**.
+Sistem Informasi Manajemen Engagement Konten Kreator adalah platform berbasis web (Laravel) yang dirancang untuk mengotomatisasi pencatatan, pemantauan performa konten (TikTok & Instagram), integrasi *scraping engine* (Apify API), serta perhitungan *engagement rate* dan visualisasi performa konten melalui dashboard dan laporan.
 
 ### Tech Stack & Core Requirements:
 - **Backend Framework:** Laravel 12 (PHP 8.2+)
@@ -13,7 +13,7 @@ Sistem Informasi Manajemen Engagement Konten Kreator adalah platform berbasis we
 - **Frontend Architecture:** Modular Blade Components (Pagination, Tables, Toast, Skeleton Loader, Modal, KPI Cards)
 - **Typography:** Font **Montserrat** (Google Fonts)
 - **Theme & Design System:** Clean & modern design, dual-mode (Dark / Light Mode) dengan Base Color variabel (Biru, Putih, Ungu)
-- **Export Formats:** PDF (DomPDF/Snappy) & Excel (Maatwebsite/Laravel-Excel)
+- **Export Formats:** PDF (`barryvdh/laravel-dompdf`) & Excel dalam format CSV (dapat dibuka di Microsoft Excel)
 
 ---
 
@@ -107,7 +107,8 @@ Menyimpan data entitas campaign pemasaran.
 | 8 | `status` | VARCHAR | 50 | 'Draft' | Status: `Draft`, `Aktif`, `Selesai`, `Arsip` |
 | 9 | `created_at` | TIMESTAMP | - | NULL | Waktu dibuat |
 | 10 | `updated_at` | TIMESTAMP | - | NULL | Waktu diubah |
-| 11 | `deleted_at` | TIMESTAMP | - | NULL | Soft delete support |
+
+> Catatan: penghapusan campaign bersifat permanen (*hard delete*). Seluruh link milik campaign ikut terhapus melalui `ON DELETE CASCADE`.
 
 ---
 
@@ -143,83 +144,87 @@ Menyimpan master data klasifikasi kreator.
 ---
 
 ### 3.6. Tabel: `links`
-Menyimpan link konten, hasil scraping metrik engagement, dan kalkulasi skor SAW.
+Menyimpan link konten dan hasil scraping metrik engagement. Satu URL hanya boleh terdaftar pada satu campaign (`url` bersifat UNIQUE).
 
 | No | Nama Kolom | Tipe Data | Ukuran | Default / Key | Keterangan |
 |---|---|---|---|---|---|
 | 1 | `id` | BIGINT UNSIGNED | - | Primary Key (Auto Inc) | ID unik link |
-| 2 | `campaign_id` | BIGINT UNSIGNED | - | Foreign Key (`campaigns.id`) | Foreign key ke campaign |
+| 2 | `campaign_id` | BIGINT UNSIGNED | - | Foreign Key (`campaigns.id`, ON DELETE CASCADE) | Foreign key ke campaign |
 | 3 | `kategori_konten_id` | BIGINT UNSIGNED | - | Foreign Key (`kategori_konten.id`) | Foreign key ke kategori konten |
 | 4 | `kategori_creator_id` | BIGINT UNSIGNED | - | Foreign Key (`kategori_creator.id`) | Foreign key ke kategori creator |
-| 5 | `url` | VARCHAR | 500 | NOT NULL | URL link konten (TikTok/Instagram) |
+| 5 | `url` | VARCHAR | 500 | UNIQUE, NOT NULL | URL link konten (TikTok/Instagram) |
 | 6 | `username` | VARCHAR | 255 | NULL | Handle akun kreator hasil scraping |
 | 7 | `platform` | VARCHAR | 50 | NULL | Platform terdeteksi (`TikTok` / `Instagram`) |
-| 8 | `caption` | TEXT | - | NULL | Teks caption postingan |
-| 9 | `tanggal_upload` | DATE | - | NULL | Tanggal upload konten hasil scraping |
-| 10 | `views` | BIGINT | - | 0 | Metrik jumlah views |
-| 11 | `likes` | BIGINT | - | 0 | Metrik jumlah suka |
-| 12 | `comments` | BIGINT | - | 0 | Metrik jumlah komentar |
-| 13 | `saves` | BIGINT | - | 0 | Metrik jumlah simpan / bookmark |
-| 14 | `shares` | BIGINT | - | 0 | Metrik jumlah bagikan |
-| 15 | `reposts` | BIGINT | - | 0 | Metrik jumlah posting ulang |
-| 16 | `engagement_rate` | DECIMAL | 5,2 | 0.00 | Persentase ER (Rate %) |
-| 17 | `saw_score` | DECIMAL | 8,4 | 0.0000 | Nilai skor preferensi SAW |
-| 18 | `status_scraping` | VARCHAR | 50 | 'Pending' | Status: `Pending`, `Berhasil`, `Gagal` |
-| 19 | `updated_at` | DATETIME | - | NULL | Waktu scraping/update terakhir |
-| 20 | `created_at` | TIMESTAMP | - | NULL | Waktu dibuat |
-
----
+| 8 | `post_type` | VARCHAR | 255 | NULL | Jenis postingan hasil scraping |
+| 9 | `caption` | TEXT | - | NULL | Teks caption postingan |
+| 10 | `post_date` | TIMESTAMP | - | NULL | Tanggal dan waktu posting hasil scraping |
+| 11 | `tanggal_upload` | DATE | - | NULL | Tanggal upload konten |
+| 12 | `views` | BIGINT | - | 0 | Metrik jumlah views |
+| 13 | `likes` | BIGINT | - | 0 | Metrik jumlah suka |
+| 14 | `comments` | BIGINT | - | 0 | Metrik jumlah komentar |
+| 15 | `saves` | BIGINT | - | 0 | Metrik jumlah simpan / bookmark |
+| 16 | `shares` | BIGINT | - | 0 | Metrik jumlah bagikan |
+| 17 | `reposts` | BIGINT | - | 0 | Metrik jumlah posting ulang |
+| 18 | `engagement_rate` | DECIMAL | 5,2 | 0.00 | Persentase ER (Rate %) |
+| 19 | `prev_views` | BIGINT | - | NULL | Views sebelum re-scraping terakhir |
+| 20 | `prev_likes` | BIGINT | - | NULL | Likes sebelum re-scraping terakhir |
+| 21 | `prev_comments` | BIGINT | - | NULL | Comments sebelum re-scraping terakhir |
+| 22 | `prev_shares` | BIGINT | - | NULL | Shares sebelum re-scraping terakhir |
+| 23 | `prev_saves` | BIGINT | - | NULL | Saves sebelum re-scraping terakhir |
+| 24 | `prev_engagement_rate` | DECIMAL | 5,2 | NULL | ER sebelum re-scraping terakhir |
+| 25 | `status_scraping` | VARCHAR | 50 | 'Belum Diproses' | Status: `Pending`, `Completed`, `Gagal` (aplikasi mengisi `Pending` saat link dimasukkan) |
+| 26 | `updated_at` | TIMESTAMP | - | NULL | Waktu data terakhir diperbarui |
+| 27 | `last_rescraped_at` | TIMESTAMP | - | NULL | Waktu re-scraping terakhir |
 
 ## 4. System Architecture & Flow Processes
 
-### 4.1. End-to-End Scraping & SAW Computation Flow
+### 4.1. End-to-End Scraping Flow
 ```
 [Admin / Admin Master]
         │
-        ▼ (Pilih Mode: Single / Bulk / CSV)
+        ▼ (Pilih Mode: Single / Bulk / Upload CSV-Excel)
 [Input Link Konten]
         │
         ▼
-[LinkController::store / processCSV]
-        │ ── (Validasi Format URL, Duplikasi, Assigned Access)
-        ▼
-[Database: Simpan Links (status_scraping = 'Pending')]
+[LinkController::store]
+        │ ── (Validasi: Hak Akses Campaign, Format URL, Duplikasi lintas campaign)
         │
-        ▼
-[Dispatch Queue Job: ProcessApifyScraping]
+        ├──► [Single / Bulk] ──► Simpan Link (status_scraping = 'Pending')
+        │                               │
+        │                               ▼
+        │                    [LinkController::refreshData]
+        │                    (dipicu dari halaman Operasional Konten)
+        │                               │
+        │                               ▼
+        │                    [Apify Actor API Request]
+        │                               │
+        │                               ├──► [Gagal / Timeout / Data Kosong] ──► status_scraping = 'Gagal'
+        │                               │
+        │                               └──► [Sukses (HTTP 200)] ──► Parse Payload (views, likes, comments, saves, shares, reposts)
+        │                                                              │
+        │                                                              ▼
+        │                                              [Hitung Engagement Rate & simpan, status = 'Completed']
         │
-        ▼
-[Apify Actor Engine API Request]
-        │
-        ├──► [Gagal Respons / Limit API] ──► Update status_scraping = 'Gagal'
-        │
-        └──► [Sukses Respons (HTTP 200)] ──► Parse Payload (views, likes, comments, saves, shares, reposts)
-                                                 │
-                                                 ▼
-                                     [SAW Calculation Service]
-                                     - Ambil semua record link di Campaign tsb
-                                     - Hitung Max Kriteria (Benefit)
-                                     - Normalisasi & Perkalian Bobot
-                                     - Update saw_score & status_scraping = 'Berhasil'
-                                                 │
-                                                 ▼
-                                     [Trigger Realtime/Toast & Refresh Dashboard Data]
+        └──► [Upload CSV / Excel] ──► Simpan Link + metrik dari isi file (status_scraping = 'Completed')
+                                                  │
+                                                  ▼
+                              [Dashboard & Laporan membaca data tabel links]
 ```
 
-### 4.2. Algoritma & Bobot SAW (*Simple Additive Weighting*)
-Semua kriteria engagement bersifat **Benefit** (semakin tinggi nilainya semakin baik):
-- **Shares:** Bobot $W_1 = 0.35$ (35%)
-- **Comments:** Bobot $W_2 = 0.25$ (25%)
-- **Likes:** Bobot $W_3 = 0.20$ (20%)
-- **Views:** Bobot $W_4 = 0.10$ (10%)
-- **Saves:** Bobot $W_5 = 0.10$ (10%)
+**Re-scraping:** Admin Master memilih link di halaman Update Campaign. Metrik saat ini disalin ke kolom `prev_*`, data baru diambil dari Apify, lalu dihitung ulang sehingga kenaikan atau penurunan bisa dibandingkan.
 
-#### Tahap 1: Normalisasi Matriks ($R$)
-$$r_{ij} = rac{x_{ij}}{\max_i(x_{ij})}$$
+### 4.2. Rumus Engagement Rate
+*Engagement Rate* (ER) dihitung per link konten dengan rumus:
 
-#### Tahap 2: Nilai Preferensi ($V_i$)
-$$V_i = (W_1 	imes r_{i,	ext{shares}}) + (W_2 	imes r_{i,	ext{comments}}) + (W_3 	imes r_{i,	ext{likes}}) + (W_4 	imes r_{i,	ext{views}}) + (W_5 	imes r_{i,	ext{saves}})$$
+```
+ER (%) = (Likes + Comments + Shares + Saves) / Views × 100
+```
 
+Aturan perhitungan:
+- Jika `Views = 0`, maka ER = 0 (mencegah pembagian dengan nol).
+- Nilai dibulatkan 2 desimal dan dibatasi maksimum 100 (kolom `DECIMAL(5,2)`).
+- Rumus yang sama dipakai di semua jalur: scraping Apify, re-scraping, edit metrik manual, dan unggah CSV/Excel.
+- Ranking konten teratas di dashboard diurutkan berdasarkan jumlah Views.
 ---
 
 ## 5. Modular Components Checklist
@@ -245,7 +250,8 @@ $$V_i = (W_1 	imes r_{i,	ext{shares}}) + (W_2 	imes r_{i,	ext{comments}}) + (W_3
 | **Kelola Campaign** (CRUD, Ganti Status, Arsip) | ✅ | ❌ | ❌ |
 | **Kelola Hak Akses Campaign** (Assign User ke Campaign) | ✅ | ❌ | ❌ |
 | **Input Link Konten** (Single, Bulk, Upload CSV) | ✅ | ✅ (Assigned) | ❌ |
-| **Refresh Data Scraping** (Trigger Apify & Hitung SAW) | ✅ | ✅ (Assigned) | ❌ |
+| **Refresh Data Scraping** (Proses link Pending via Apify) | ✅ | ✅ (Assigned) | ❌ |
+| **Update Campaign / Re-scraping Ulang** (Perbarui metrik link terpilih) | ✅ | ❌ | ❌ |
 | **Dashboard Campaign** (KPI, Chart Engagement, Breakdown) | ✅ (Semua) | ✅ (Assigned) | ✅ (Assigned) |
-| **Top Content SAW Ranking & Detail Konten** | ✅ | ✅ | ✅ |
-| **Export Laporan** (PDF & Excel) | ✅ | ✅ | ✅ |
+| **Top Content (urut Views) & Detail Konten** | ✅ | ✅ | ✅ |
+| **Export Laporan** (PDF & Excel/CSV) | ✅ | ✅ | ✅ |
