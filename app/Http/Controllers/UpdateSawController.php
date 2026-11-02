@@ -7,6 +7,7 @@ use App\Models\Link;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class UpdateSawController extends Controller
 {
@@ -308,7 +309,7 @@ class UpdateSawController extends Controller
                         }
                     }
                 } catch (\Throwable $e) {
-                    \Log::error("Error re-scraping link {$link->id}: " . $e->getMessage());
+                    Log::error("Error re-scraping link {$link->id}: " . $e->getMessage());
                     if (($link->views ?? 0) > 0 || ($link->likes ?? 0) > 0) {
                         $link->update([
                             'status_scraping' => 'Completed',
